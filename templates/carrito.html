@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Carrito de Compras</title>
+</head>
+<body>
+    <h1>Carrito de Compras</h1>
+    {% if carrito %}
+    <ul>
+        {% for item in carrito %}
+        <li>
+            {{ item.nombre }} - ${{ item.precio }} x {{ item.cantidad }} = ${{ item.cantidad * item.precio }}
+            <form action="/cliente/carrito/eliminar/{{ item.id }}" method="post" style="display:inline;">
+                <button type="submit">Eliminar</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    <h3>Total: ${{ total }}</h3>
+    <form action="{{ url_for('carrito') }}" method="POST">
+        <label for="metodo_pago">Método de Pago:</label>
+        <select name="metodo_pago" id="metodo_pago">
+            <option value="tarjeta">Tarjeta</option>
+            <option value="efectivo">Efectivo</option>
+        </select>
+        <button type="submit">Confirmar Compra</button>
+    </form>    
+    {% else %}
+    <p>Tu carrito está vacío.</p>
+    {% endif %}
+    <a href="/cliente">Regresar a la Tienda</a>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Panel de Administración</title>
+</head>
+<body>
+    <h1>Panel de Administración</h1>
+    <a href="/">Regresar</a>
+    <br><br>
+
+    <!-- Formulario para agregar productos -->
+    <form action="/add_product" method="post">
+        <input type="text" name="name" placeholder="Nombre del producto" required>
+        <input type="number" step="0.01" name="price" placeholder="Precio" required>
+        <input type="number" name="stock" placeholder="Stock" required>
+        <button type="submit">Agregar Producto</button>
+    </form>
+
+    <h2>Productos</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Precio</th>
+                <th>Stock</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td>{{ product[0] }}</td>
+                <td>
+                    <form action="/edit_product/{{ product[0] }}" method="post">
+                        <input type="text" name="name" value="{{ product[1] }}" required>
+                </td>
+                <td><input type="number" step="0.01" name="price" value="{{ product[2] }}" required></td>
+                <td><input type="number" name="stock" value="{{ product[3] }}" required></td>
+                <td>
+                        <button type="submit">Modificar</button>
+                    </form>
+                    <form action="/delete_product/{{ product[0] }}" method="get" style="display:inline;">
+                        <button type="submit" style="color:red;">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

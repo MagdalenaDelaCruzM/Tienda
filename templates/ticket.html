@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ticket de Compra</title>
+</head>
+<body>
+    <h1>Ticket de Compra</h1>
+    <p><strong>Método de Pago:</strong> {{ metodo_pago }}</p>
+    <p><strong>Productos Comprados:</strong></p>
+    <ul>
+        {% for item in carrito %}
+        <li>
+            {{ item.nombre }} - ${{ item.precio }} x {{ item.cantidad }} = ${{ item.cantidad * item.precio }}
+        </li>
+        {% endfor %}
+    </ul>
+    <h3>Total Pagado: ${{ total }}</h3>
+    <br>
+    <button onclick="window.print()">Imprimir Ticket</button>
+    <br><br>
+    <a href="/cliente">Regresar a la Tienda</a>
+</body>
+</html>
