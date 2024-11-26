@@ -1,33 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Carrito de Compras</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrito</title>
 </head>
 <body>
-    <h1>Carrito de Compras</h1>
-    {% if carrito %}
-    <ul>
-        {% for item in carrito %}
-        <li>
-            {{ item.nombre }} - ${{ item.precio }} x {{ item.cantidad }} = ${{ item.cantidad * item.precio }}
-            <form action="/cliente/carrito/eliminar/{{ item.id }}" method="post" style="display:inline;">
-                <button type="submit">Eliminar</button>
-            </form>
-        </li>
-        {% endfor %}
-    </ul>
-    <h3>Total: ${{ total }}</h3>
-    <form action="{{ url_for('carrito') }}" method="POST">
-        <label for="metodo_pago">Método de Pago:</label>
-        <select name="metodo_pago" id="metodo_pago">
-            <option value="tarjeta">Tarjeta</option>
-            <option value="efectivo">Efectivo</option>
+    <h1>Tu Carrito</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Total</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in carrito %}
+            <tr>
+                <td>{{ item.nombre }}</td>
+                <td>{{ item.cantidad }}</td>
+                <td>${{ item.precio }}</td>
+                <td>${{ item.cantidad * item.precio }}</td>
+                <td>
+                    <form action="{{ url_for('eliminar_del_carrito', id=item.id) }}" method="post" style="display:inline;">
+                        <button type="submit" style="color:red;">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p><strong>Total: ${{ total }}</strong></p>
+    
+    <h2>Método de Pago</h2>
+    <form action="{{ url_for('confirmar_compra') }}" method="post">
+        <label for="metodo_pago">Seleccione un método de pago:</label>
+        <select name="metodo_pago" id="metodo_pago" required>
+            <option value="Tarjeta de Crédito">Tarjeta de Crédito</option>
+            <option value="Efectivo">Efectivo</option>
+            <option value="PayPal">PayPal</option>
         </select>
+        <br><br>
         <button type="submit">Confirmar Compra</button>
-    </form>    
-    {% else %}
-    <p>Tu carrito está vacío.</p>
-    {% endif %}
-    <a href="/cliente">Regresar a la Tienda</a>
+    </form>
+    
+    <br>
+    <a href="/cliente/productos">Seguir comprando</a>
 </body>
 </html>

@@ -1,5 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from models import db, Producto, Venta
+from datetime import datetime
+from flask import make_response
+from xhtml2pdf import pisa
+import io
+import os
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tienda.db'
@@ -16,174 +22,130 @@ with app.app_context():
 def index():
     return render_template('index.html')
 
+
 # Login de administrador
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
 
-        # Verificar credenciales (esto es solo para pruebas, mejorar en producción)
+        # Validar credenciales (puedes cambiar esto por validación en base de datos)
         if username == 'admin' and password == 'admin123':
             session['admin'] = True
             flash('Inicio de sesión exitoso.', 'success')
-            return redirect(url_for('admin'))
+            return redirect(url_for('admin_panel'))  # Redirige al panel de administración
         else:
-            flash('Credenciales incorrectas.', 'danger')
-    return render_template('login.html')
+            flash('Usuario o contraseña incorrectos.', 'danger')
+            return redirect(url_for('login'))
+
+    return render_template('login.html')  # Renderiza el formulario de inicio de sesión
+
+
 
 # Logout de administrador
-@app.route('/logout')
-def logout():
+@app.route('/admin/logout')
+def admin_logout():
     session.pop('admin', None)
     flash('Sesión cerrada exitosamente.', 'info')
     return redirect(url_for('index'))
 
-# Panel de administración
+# Panel de administración (protegido por autenticación)
 @app.route('/admin')
 def admin_panel():
     if not session.get('admin'):
-        flash('Acceso no autorizado.', 'danger')
-        return redirect(url_for('login'))
+        flash('Acceso no autorizado. Inicia sesión primero.', 'danger')
+        return redirect(url_for('admin_login'))
 
     productos = Producto.query.all()
     return render_template('admin.html', productos=productos)
 
-@app.route('/admin/agregar', methods=['GET', 'POST'])
+# Agregar producto
+@app.route('/add_product', methods=['POST'])
 def agregar_producto():
-    if not session.get('admin'):  # Verifica si el administrador está logueado
-        flash('Acceso no autorizado.', 'danger')
-        return redirect(url_for('login'))
+    nombre = request.form['nombre']
+    precio = float(request.form['precio'])
+    stock = int(request.form['stock'])
+    imagen = request.form.get('imagen')  # URL de la imagen (opcional)
 
-    if request.method == 'POST':
-        try:
-            # Recibe los datos del formulario
-            nombre = request.form['nombre']
-            precio = float(request.form['precio'])  # Convierte el precio a float
-            stock = int(request.form['stock'])  # Convierte el stock a int
+    nuevo_producto = Producto(nombre=nombre, precio=precio, stock=stock, imagen=imagen)
+    db.session.add(nuevo_producto)
+    db.session.commit()
 
-            # Crea un nuevo objeto Producto
-            nuevo_producto = Producto(nombre=nombre, precio=precio, stock=stock)
-            
-            # Agrega el nuevo producto a la sesión de la base de datos
-            db.session.add(nuevo_producto)
-            db.session.commit()
+    flash('Producto agregado exitosamente.', 'success')
+    return redirect(url_for('admin_panel'))
 
-            flash('Producto agregado con éxito.', 'success')  # Mensaje de éxito
-            return redirect(url_for('admin'))  # Redirige al panel de administración
-        except Exception as e:
-            flash(f'Error al agregar el producto: {str(e)}', 'danger')  # Muestra mensaje de error
-    return render_template('agregar_producto.html')  # Muestra el formulario de agregar producto
+from flask import request, jsonify
 
-# Editar un producto
-@app.route('/admin/editar/<int:id>', methods=['GET', 'POST'])
+@app.route('/edit_product/<int:id>', methods=['POST'])
 def editar_producto(id):
-    if not session.get('admin'):
-        flash('Acceso no autorizado.', 'danger')
-        return redirect(url_for('login'))
-
     producto = Producto.query.get_or_404(id)
-    if request.method == 'POST':
-        try:
-            producto.nombre = request.form['nombre']
-            producto.precio = float(request.form['precio'])
-            producto.stock = int(request.form['stock'])
+    data = request.get_json()
 
-            if producto.precio <= 0 or producto.stock < 0:
-                flash('El precio y el stock deben ser valores positivos.', 'warning')
-                return redirect(url_for('editar_producto', id=id))
+    producto.nombre = data.get('nombre', producto.nombre)
+    producto.precio = data.get('precio', producto.precio)
+    producto.stock = data.get('stock', producto.stock)
+    producto.imagen = data.get('imagen', producto.imagen)
 
-            db.session.commit()
-            flash('Producto actualizado con éxito.', 'success')
-            return redirect(url_for('admin'))
-        except Exception as e:
-            flash(f'Error al actualizar el producto: {str(e)}', 'danger')
-    return render_template('editar_producto.html', producto=producto)
+    db.session.commit()
 
-# Eliminar un producto
-@app.route('/admin/eliminar/<int:id>', methods=['POST'])
+    return jsonify(success=True, message="Producto actualizado exitosamente")
+
+# Eliminar producto
+@app.route('/delete_product/<int:id>', methods=['POST'])
 def eliminar_producto(id):
     if not session.get('admin'):
         flash('Acceso no autorizado.', 'danger')
-        return redirect(url_for('login'))
+        return redirect(url_for('admin_login'))
 
-    try:
-        producto = Producto.query.get_or_404(id)
-        db.session.delete(producto)
-        db.session.commit()
-        flash('Producto eliminado con éxito.', 'success')
-    except Exception as e:
-        flash(f'Error al eliminar el producto: {str(e)}', 'danger')
+    producto = Producto.query.get_or_404(id)
+    db.session.delete(producto)
+    db.session.commit()
+    flash('Producto eliminado exitosamente.', 'success')
+    return redirect(url_for('admin_panel'))
 
-    return redirect(url_for('admin'))
+# Página de productos para clientes
+@app.route('/cliente/productos')
+def productos_cliente():
+    # Filtrar productos con stock mayor a 0
+    productos = Producto.query.filter(Producto.stock > 0).all()
+    return render_template('clientes.html', productos=productos)
 
-# Panel del cliente
-@app.route('/cliente')
-def cliente():
-    productos = Producto.query.all()
-    carrito = session.get('carrito', [])
-    total = sum(item['cantidad'] * item['precio'] for item in carrito)
-    return render_template('cliente.html', productos=productos, carrito=carrito, total=total)
 
 # Agregar producto al carrito
 @app.route('/cliente/comprar/<int:id>', methods=['POST'])
 def agregar_carrito(id):
-    producto = Producto.query.get(id)
-    if not producto:
-        flash('Producto no encontrado.', 'danger')
-        return redirect(url_for('cliente'))
-
+    producto = Producto.query.get_or_404(id)
     cantidad = int(request.form.get('cantidad', 0))
-    if cantidad <= 0 or cantidad > producto.stock:
-        flash(f'Cantidad inválida. Stock disponible: {producto.stock}.', 'warning')
-        return redirect(url_for('cliente'))
 
+    # Validar si la cantidad solicitada es válida
+    if cantidad <= 0 or cantidad > producto.stock:
+        flash(f"No puedes agregar más de {producto.stock} unidad(es) de {producto.nombre}.", 'danger')
+        return redirect(url_for('productos_cliente'))
+
+    # Agregar al carrito
     carrito = session.setdefault('carrito', [])
     for item in carrito:
-        if item['id'] == id:
+        if item['id'] == producto.id:
             item['cantidad'] += cantidad
+            
+            # Asegurarse de que no exceda el stock
+            if item['cantidad'] > producto.stock:
+                item['cantidad'] = producto.stock
+                flash(f"Cantidad ajustada al stock disponible para {producto.nombre}.", 'warning')
             break
     else:
         carrito.append({'id': producto.id, 'nombre': producto.nombre, 'precio': producto.precio, 'cantidad': cantidad})
 
     session.modified = True
-    flash(f'{producto.nombre} agregado al carrito.', 'success')
-    return redirect(url_for('cliente'))
+    flash(f"{cantidad} unidad(es) de {producto.nombre} agregada(s) al carrito.", 'success')
+    return redirect(url_for('productos_cliente'))
 
-# Comprar productos del carrito
-@app.route('/cliente/carrito', methods=['GET', 'POST'])
+# Ver carrito
+@app.route('/cliente/carrito')
 def carrito():
     carrito = session.get('carrito', [])
     total = sum(item['cantidad'] * item['precio'] for item in carrito)
-
-    if request.method == 'POST':
-        metodo_pago = request.form.get('metodo_pago')
-        if not metodo_pago:
-            flash('Seleccione un método de pago.', 'warning')
-            return redirect(url_for('carrito'))
-
-        try:
-            for item in carrito:
-                producto = Producto.query.get(item['id'])
-                if item['cantidad'] > producto.stock:
-                    flash(f'Stock insuficiente para {producto.nombre}.', 'danger')
-                    return redirect(url_for('carrito'))
-
-                producto.stock -= item['cantidad']
-                nueva_venta = Venta(
-                    producto_id=producto.id,
-                    cantidad=item['cantidad'],
-                    total=item['cantidad'] * producto.precio
-                )
-                db.session.add(nueva_venta)
-
-            db.session.commit()
-            session.pop('carrito', None)
-            flash('Compra realizada con éxito.', 'success')
-            return redirect(url_for('ticket'))
-        except Exception as e:
-            flash(f'Error al procesar la compra: {str(e)}', 'danger')
-
     return render_template('carrito.html', carrito=carrito, total=total)
 
 @app.route('/cliente/carrito/eliminar/<int:id>', methods=['POST'])
@@ -194,6 +156,102 @@ def eliminar_del_carrito(id):
     flash('Producto eliminado del carrito.', 'info')
     return redirect(url_for('carrito'))
 
+
+@app.route('/cliente/carrito/confirmar', methods=['POST'])
+def confirmar_compra():
+    carrito = session.get('carrito', [])
+    metodo_pago = request.form.get('metodo_pago')
+
+    if not carrito:
+        flash('El carrito está vacío. Agregue productos antes de confirmar la compra.', 'warning')
+        return redirect(url_for('carrito'))
+
+    try:
+        total = 0
+        for item in carrito:
+            producto = Producto.query.get(item['id'])
+            
+            # Validar si hay suficiente stock
+            if item['cantidad'] > producto.stock:
+                flash(f"No hay suficiente stock para el producto {producto.nombre}. Stock disponible: {producto.stock}", 'danger')
+                return redirect(url_for('carrito'))
+            
+            # Actualizar el stock
+            producto.stock -= item['cantidad']
+            db.session.add(producto)
+            total += item['cantidad'] * producto.precio
+        
+        db.session.commit()
+
+        # Generar información del ticket
+        fecha_hora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        session['ticket_productos'] = carrito
+        session['ticket_metodo_pago'] = metodo_pago
+        session['ticket_total'] = total
+        session['ticket_fecha_hora'] = fecha_hora
+
+        # Limpiar el carrito
+        session.pop('carrito', None)
+        session.modified = True
+
+        flash('Compra realizada con éxito.', 'success')
+        return render_template('ticket.html', ticket={
+            'productos': carrito,
+            'metodo_pago': metodo_pago,
+            'total': total,
+            'fecha_hora': fecha_hora
+        }, pdf=False)
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al procesar la compra: {str(e)}', 'danger')
+        return redirect(url_for('carrito'))
+
+    
+@app.route('/cliente/ticket/pdf', methods=['GET'])
+def generar_ticket_pdf():
+    # Simular los datos del ticket (puedes adaptarlo según tu lógica)
+    ticket = {
+        'productos': session.get('ticket_productos', []),
+        'metodo_pago': session.get('ticket_metodo_pago', ''),
+        'total': session.get('ticket_total', 0.0),
+        'fecha_hora': session.get('ticket_fecha_hora', '')
+    }
+
+    # Renderizar el HTML del ticket
+    rendered_html = render_template('ticket.html', ticket=ticket)
+    
+    # Convertir el HTML a PDF
+    pdf = io.BytesIO()
+    pisa_status = pisa.CreatePDF(io.StringIO(rendered_html), dest=pdf)
+    
+    if pisa_status.err:
+        return "Hubo un error al generar el PDF", 500
+
+    # Devolver el PDF como respuesta
+    pdf.seek(0)
+    response = make_response(pdf.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = 'inline; filename=ticket.pdf'
+    return response
+
+@app.route('/upload_image', methods=['POST'])
+def upload_image():
+    if 'file' not in request.files:
+        flash('No se seleccionó ningún archivo', 'danger')
+        return redirect(url_for('admin_panel'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash('El archivo no tiene nombre', 'danger')
+        return redirect(url_for('admin_panel'))
+
+    if file:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join('static/images', filename))
+        flash('Imagen subida exitosamente.', 'success')
+        return redirect(url_for('admin_panel'))
+        # Ahora puedes guardar 'ruta_imagen' en la base de datos
 
 if __name__ == '__main__':
     app.run(debug=True)

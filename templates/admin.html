@@ -1,52 +1,181 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Administración</title>
+    <!-- Importar Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .table-container {
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn {
+            margin-right: 5px;
+        }
+        .form-container {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+        }
+    </style>
+    <script>
+        // Función para abrir el modal y llenar los datos del producto
+        function abrirModal(id, nombre, precio, stock, imagen) {
+            document.getElementById('productoId').value = id;
+            document.getElementById('productoNombre').value = nombre;
+            document.getElementById('productoPrecio').value = precio;
+            document.getElementById('productoStock').value = stock;
+            document.getElementById('productoImagen').value = imagen;
+            const modal = new bootstrap.Modal(document.getElementById('modalEditar'));
+            modal.show();
+        }
+
+        // Función para guardar los cambios del producto
+        async function guardarCambios() {
+            const id = document.getElementById('productoId').value;
+            const nombre = document.getElementById('productoNombre').value;
+            const precio = document.getElementById('productoPrecio').value;
+            const stock = document.getElementById('productoStock').value;
+            const imagen = document.getElementById('productoImagen').value;
+
+            try {
+                const response = await fetch(`/edit_product/${id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ nombre, precio, stock, imagen })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Producto modificado correctamente');
+                    location.reload(); // Recargar la página para reflejar los cambios
+                } else {
+                    alert('Error al modificar el producto: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Hubo un error al guardar los cambios.');
+            }
+        }
+    </script>
 </head>
-<body>
-    <h1>Panel de Administración</h1>
-    <a href="/">Regresar</a>
-    <br><br>
+<body class="bg-light">
 
-    <!-- Formulario para agregar productos -->
-    <form action="/add_product" method="post">
-        <input type="text" name="name" placeholder="Nombre del producto" required>
-        <input type="number" step="0.01" name="price" placeholder="Precio" required>
-        <input type="number" name="stock" placeholder="Stock" required>
-        <button type="submit">Agregar Producto</button>
-    </form>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Panel de Administración</h1>
+        <div class="d-flex justify-content-end mb-3">
+            <a href="/admin/logout" class="btn btn-danger">Cerrar Sesión</a>
+        </div>
 
-    <h2>Productos</h2>
-    <table border="1">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Precio</th>
-                <th>Stock</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for product in products %}
-            <tr>
-                <td>{{ product[0] }}</td>
-                <td>
-                    <form action="/edit_product/{{ product[0] }}" method="post">
-                        <input type="text" name="name" value="{{ product[1] }}" required>
-                </td>
-                <td><input type="number" step="0.01" name="price" value="{{ product[2] }}" required></td>
-                <td><input type="number" name="stock" value="{{ product[3] }}" required></td>
-                <td>
-                        <button type="submit">Modificar</button>
+        <!-- Formulario para agregar productos -->
+        <div class="form-container mb-4">
+            <form action="/add_product" method="post" class="row g-3">
+                <div class="col-md-3">
+                    <input type="text" name="nombre" class="form-control" placeholder="Nombre del producto" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="precio" step="0.01" class="form-control" placeholder="Precio" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="stock" class="form-control" placeholder="Stock" required>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" name="imagen" class="form-control" placeholder="URL de la imagen">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100">Agregar Producto</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tabla de productos -->
+        <div class="table-container">
+            <h2 class="text-center mb-3">Productos</h2>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Precio</th>
+                            <th>Stock</th>
+                            <th>Imagen</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for producto in productos %}
+                        <tr>
+                            <td>{{ producto.id }}</td>
+                            <td>{{ producto.nombre }}</td>
+                            <td>${{ producto.precio }}</td>
+                            <td>{{ producto.stock }}</td>
+                            <td>
+                                <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" style="width: 50px; height: auto;">
+                            </td>
+                            <td>
+                                <button class="btn btn-primary btn-sm" onclick="abrirModal('{{ producto.id }}', '{{ producto.nombre }}', '{{ producto.precio }}', '{{ producto.stock }}', '{{ producto.imagen }}')">Modificar</button>
+                                <form action="/delete_product/{{ producto.id }}" method="post" style="display:inline;">
+                                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar productos -->
+    <div class="modal fade" id="modalEditar" tabindex="-1" aria-labelledby="modalEditarLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalEditarLabel">Editar Producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formEditar">
+                        <input type="hidden" id="productoId">
+                        <div class="mb-3">
+                            <label for="productoNombre" class="form-label">Nombre:</label>
+                            <input type="text" id="productoNombre" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label for="productoPrecio" class="form-label">Precio:</label>
+                            <input type="number" step="0.01" id="productoPrecio" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label for="productoStock" class="form-label">Stock:</label>
+                            <input type="number" id="productoStock" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label for="productoImagen" class="form-label">URL de la Imagen:</label>
+                            <input type="text" id="productoImagen" class="form-control">
+                        </div>
                     </form>
-                    <form action="/delete_product/{{ product[0] }}" method="get" style="display:inline;">
-                        <button type="submit" style="color:red;">Eliminar</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" onclick="guardarCambios()">Guardar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Importar Scripts de Bootstrap -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

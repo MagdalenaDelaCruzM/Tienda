@@ -1,23 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ticket de Compra</title>
 </head>
 <body>
     <h1>Ticket de Compra</h1>
-    <p><strong>Método de Pago:</strong> {{ metodo_pago }}</p>
-    <p><strong>Productos Comprados:</strong></p>
-    <ul>
-        {% for item in carrito %}
-        <li>
-            {{ item.nombre }} - ${{ item.precio }} x {{ item.cantidad }} = ${{ item.cantidad * item.precio }}
-        </li>
-        {% endfor %}
-    </ul>
-    <h3>Total Pagado: ${{ total }}</h3>
+    <p><strong>Fecha y Hora:</strong> {{ ticket.fecha_hora }}</p>
+    <p><strong>Método de Pago:</strong> {{ ticket.metodo_pago }}</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in ticket.productos %}
+            <tr>
+                <td>{{ item.nombre }}</td>
+                <td>{{ item.cantidad }}</td>
+                <td>${{ item.precio }}</td>
+                <td>${{ item.cantidad * item.precio }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p><strong>Total Pagado:</strong> ${{ ticket.total }}</p>
+
+    {% if not pdf %}
     <br>
-    <button onclick="window.print()">Imprimir Ticket</button>
+    <a href="{{ url_for('generar_ticket_pdf') }}" target="_blank">Imprimir Ticket (PDF)</a>
     <br><br>
-    <a href="/cliente">Regresar a la Tienda</a>
+    <a href="{{ url_for('productos_cliente') }}">Volver al Inicio</a>
+    {% endif %}
 </body>
 </html>
