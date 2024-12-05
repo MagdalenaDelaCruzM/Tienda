@@ -1,0 +1,22 @@
+<table>
+    <thead>
+        <tr>
+            <th>ID Venta</th>
+            <th>Fecha y Hora</th>
+            <th>Producto</th>
+            <th>Cantidad</th>
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for venta in ventas %}
+        <tr>
+            <td>{{ venta.id }}</td>
+            <td>{{ venta.fecha_hora }}</td>
+            <td>{{ venta.producto }}</td>
+            <td>{{ venta.cantidad }}</td>
+            <td>${{ venta.total }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
